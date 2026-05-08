@@ -96,4 +96,5 @@ class Triangulation {
         void computeVertexCurvatures();
         std::vector<double> getVertexCurvatures();
         void printVertexCurvatures();
+        double getTotalCurvature();
 };

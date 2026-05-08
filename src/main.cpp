@@ -1,11 +1,20 @@
 #include <iostream>
 #include "halfedge2.hpp"
+#include "CLI11.hpp"
 
-int main() {
+int main(int argc, char** argv) {
+    CLI::App app{"Computes the curvature at every vertex of a mesh. Assumes the mesh is closed and manifold."};
+    argv = app.ensure_utf8(argv);
+
+    std::string filename = "data/cube.obj";
+    app.add_option("filename", filename, "Path to the input .obj file. Included is data/cube.obj, data/bunny.obj, and data/cow.obj. Defaults to data/cube.obj.");
+
+    CLI11_PARSE(app, argc, argv);
+    
     Triangulation mesh;
     
     std::cout << "Loading mesh..." << std::endl;
-    mesh.loadFromObj("data/cow.obj");
+    mesh.loadFromObj(filename);
     
     auto vertices = mesh.getVertices();
     auto halfedges = mesh.getHalfedges();

@@ -180,6 +180,14 @@ void Triangulation::printVertexCurvatures() {
     std::cout << std::endl;
 }
 
+double Triangulation::getTotalCurvature() {
+    auto total = 0;
+    for (size_t v = 0; v < vertex_curvatures_.size(); v++) {
+        total += vertex_curvatures_[v];
+    }
+    return total;
+}
+
 
 ///////////////////////////////////////////////////////////
 //                  Vertex Methods                       //
