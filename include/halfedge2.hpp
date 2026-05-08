@@ -109,4 +109,6 @@ struct Triangulation {
         HalfEdge* halfedgesAsArray();
         double* edgeLengthsAsArray();
         double* vertCurvaturesAsArray();
+
+        double* coordsAsArray();
 };

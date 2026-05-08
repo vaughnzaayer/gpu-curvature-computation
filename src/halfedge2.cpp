@@ -212,6 +212,16 @@ double* Triangulation::vertCurvaturesAsArray() {
     return vertex_curvatures_.data();
 }
 
+double* Triangulation::coordsAsArray() {
+    std::vector<double> coords_array;
+    for (Vertex v : vertices_) {
+        coords_array.push_back(v.x());
+        coords_array.push_back(v.y());
+        coords_array.push_back(v.z());
+    }
+    return coords_array.data();
+}
+
 
 ///////////////////////////////////////////////////////////
 //                  Vertex Methods                       //
