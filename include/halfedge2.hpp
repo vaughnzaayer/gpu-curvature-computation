@@ -111,4 +111,5 @@ struct Triangulation {
         double* vertCurvaturesAsArray();
 
         double* coordsAsArray();
+        size_t* edgeSrcAndTgtAsArray();
 };

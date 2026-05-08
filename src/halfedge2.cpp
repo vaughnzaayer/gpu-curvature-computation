@@ -222,6 +222,15 @@ double* Triangulation::coordsAsArray() {
     return coords_array.data();
 }
 
+size_t* Triangulation::edgeSrcAndTgtAsArray() {
+    std::vector<size_t> idx_array;
+    for (HalfEdge e : halfedges_) {
+        idx_array.push_back(e.getSourceVertex());
+        idx_array.push_back(e.getTargetVertex());
+    }
+    return idx_array.data();
+}
+
 
 ///////////////////////////////////////////////////////////
 //                  Vertex Methods                       //
