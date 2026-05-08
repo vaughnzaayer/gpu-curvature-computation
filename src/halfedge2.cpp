@@ -188,6 +188,30 @@ double Triangulation::getTotalCurvature() {
     return total;
 }
 
+size_t Triangulation::getVertexCount() {
+    return vertices_.size();
+}
+
+size_t Triangulation::getHalfedgeCount() {
+    return halfedges_.size();
+}
+
+Vertex* Triangulation::verticesAsArray() {
+    return vertices_.data();
+}
+
+HalfEdge* Triangulation::halfedgesAsArray() {
+    return halfedges_.data();
+}
+
+double* Triangulation::edgeLengthsAsArray() {
+    return edge_lengths_.data();
+}
+
+double* Triangulation::vertCurvaturesAsArray() {
+    return vertex_curvatures_.data();
+}
+
 
 ///////////////////////////////////////////////////////////
 //                  Vertex Methods                       //

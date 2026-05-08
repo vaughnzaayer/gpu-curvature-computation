@@ -18,9 +18,9 @@ struct TupleHash {
     }
 };
 
-class Triangulation;
+struct Triangulation;
 
-class Vertex {
+struct Vertex {
     private:
         Triangulation* tri_;
         size_t id_;
@@ -43,7 +43,7 @@ class Vertex {
         std::tuple<double, double, double> getCoords();
 };
 
-class HalfEdge {
+struct HalfEdge {
     private:
         Triangulation* tri_;
         size_t id_;
@@ -73,7 +73,7 @@ class HalfEdge {
         void setNextHalfedge(size_t next_id);
 };
 
-class Triangulation {
+struct Triangulation {
     private:
         std::vector<Vertex> vertices_;
         std::vector<HalfEdge> halfedges_;
@@ -97,4 +97,12 @@ class Triangulation {
         std::vector<double> getVertexCurvatures();
         void printVertexCurvatures();
         double getTotalCurvature();
+
+        size_t getVertexCount();
+        size_t getHalfedgeCount();
+
+        Vertex* verticesAsArray();
+        HalfEdge* halfedgesAsArray();
+        double* edgeLengthsAsArray();
+        double* vertCurvaturesAsArray();
 };
