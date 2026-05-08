@@ -2,7 +2,7 @@
 This program computes the discrete Gaussian curvature (angle defect) at each vertex. So far, it only considers closed, manifold, and triangular meshes, and computes curvature linearly with standard C++20. 
 
 ## Building
-First, clone the project using `git clone ...`. Then, `cd` into the project directory and run the following to build:
+First, clone the project using `git clone https://github.com/vaughnzaayer/gpu-curvature-computation.git`. Then, `cd` into the project directory and run the following to build:
 
 ```
 cmake -B build
