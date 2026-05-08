@@ -11,7 +11,7 @@ or to build with optimizations,
 ```
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 ```
-Note that you will need the minimum requirements of C++20 and CMAKE version 3.15 or greater. To compile, run
+Note that you will need the minimum requirements of C++20 and CMAKE version 3.21 or greater. To compile, run
 ```
 cmake --build build
 ```
