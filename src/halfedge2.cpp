@@ -223,6 +223,18 @@ Vertex::Vertex(double x, double y, double z) {
     z_ = z;
 }
 
+double Vertex::x() {
+    return x_;
+}
+
+double Vertex::y() {
+    return y_;
+}
+
+double Vertex::z() {
+    return z_;
+}
+
 Triangulation* Vertex::getTriangulation() {
     return tri_;
 }
