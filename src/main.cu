@@ -71,10 +71,10 @@ int main(int argc, char** argv) {
     double* d_els = nullptr;
 
     // Allocate host memory via HIP
-    cudaHostMalloc(&h_vs, 3*vertex_count*sizeof(double));
-    cudaHostMalloc(&h_es, 2*he_count*sizeof(size_t));
-    cudaHostMalloc(&h_vks, vertex_count*sizeof(double));
-    cudaHostMalloc(&h_els, he_count*sizeof(double));
+    cudaMallocHost(&h_vs, 3*vertex_count*sizeof(double));
+    cudaMallocHost(&h_es, 2*he_count*sizeof(size_t));
+    cudaMallocHost(&h_vks, vertex_count*sizeof(double));
+    cudaMallocHost(&h_els, he_count*sizeof(double));
 
     // Assign host arrays
     mesh.fillCoordsArray(h_vs);
