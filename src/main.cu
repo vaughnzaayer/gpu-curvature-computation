@@ -1,7 +1,7 @@
 #include <iostream>
 #include "halfedge2.hpp"
 #include "CLI11.hpp"
-#include <hip/hip_runtime.h>
+#include <cuda_runtime.h>
 
 __global__ void compEdgeLens(const size_t* dev_edges, const double* dev_coords, double* dev_dest, size_t n) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -71,34 +71,34 @@ int main(int argc, char** argv) {
     double* d_els = nullptr;
 
     // Allocate host memory via HIP
-    hipHostMalloc(&h_vs, 3*vertex_count*sizeof(double));
-    hipHostMalloc(&h_es, 2*he_count*sizeof(size_t));
-    hipHostMalloc(&h_vks, vertex_count*sizeof(double));
-    hipHostMalloc(&h_els, he_count*sizeof(double));
+    cudaHostMalloc(&h_vs, 3*vertex_count*sizeof(double));
+    cudaHostMalloc(&h_es, 2*he_count*sizeof(size_t));
+    cudaHostMalloc(&h_vks, vertex_count*sizeof(double));
+    cudaHostMalloc(&h_els, he_count*sizeof(double));
 
     // Assign host arrays
     mesh.fillCoordsArray(h_vs);
     mesh.fillEdgeVtxArray(h_es);
 
     // Allocate device (GPU) memory
-    hipMalloc(&d_vs, 3*vertex_count*sizeof(double));
-    hipMalloc(&d_es, 2*he_count*sizeof(size_t));
-    hipMalloc(&d_vks, vertex_count*sizeof(double));
-    hipMalloc(&d_els, he_count*sizeof(double));
+    cudaMalloc(&d_vs, 3*vertex_count*sizeof(double));
+    cudaMalloc(&d_es, 2*he_count*sizeof(size_t));
+    cudaMalloc(&d_vks, vertex_count*sizeof(double));
+    cudaMalloc(&d_els, he_count*sizeof(double));
 
     // Memcopy host -> device
-    hipMemcpy(d_vs, h_vs, 3*vertex_count*sizeof(double), hipMemcpyDefault);
-    hipMemcpy(d_es, h_es, 2*he_count*sizeof(size_t), hipMemcpyDefault);
+    cudaMemcpy(d_vs, h_vs, 3*vertex_count*sizeof(double), cudaMemcpyDefault);
+    cudaMemcpy(d_es, h_es, 2*he_count*sizeof(size_t), cudaMemcpyDefault);
     
     // Call kernel
     int threads_per_block = 256;
     int blocks = (int(he_count) + threads_per_block) / threads_per_block;
     compEdgeLens<<<blocks, threads_per_block>>>(d_es, d_vs, d_els, he_count);
     
-    hipDeviceSynchronize();
+    cudaDeviceSynchronize();
 
     // Memcopy device -> host
-    hipMemcpy(h_els, d_els, he_count*sizeof(double), hipMemcpyDefault);
+    cudaMemcpy(h_els, d_els, he_count*sizeof(double), cudaMemcpyDefault);
 
     std::cout << "Edge lengths: ";
     for(size_t i = 0; i < he_count; i++) {
@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
     }
     std::cout << std::endl;
 
-    hipDeviceReset();
+    cudaDeviceReset();
 
     return 0;
 }
