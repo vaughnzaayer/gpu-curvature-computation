@@ -110,6 +110,6 @@ struct Triangulation {
         double* edgeLengthsAsArray();
         double* vertCurvaturesAsArray();
 
-        double* coordsAsArray();
-        size_t* edgeSrcAndTgtAsArray();
+        void fillCoordsArray(double* array);
+        void fillEdgeVtxArray(size_t* array);
 };

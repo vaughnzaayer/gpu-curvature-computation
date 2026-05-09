@@ -212,23 +212,21 @@ double* Triangulation::vertCurvaturesAsArray() {
     return vertex_curvatures_.data();
 }
 
-double* Triangulation::coordsAsArray() {
-    std::vector<double> coords_array;
-    for (Vertex v : vertices_) {
-        coords_array.push_back(v.x());
-        coords_array.push_back(v.y());
-        coords_array.push_back(v.z());
+void Triangulation::fillCoordsArray(double* array) {
+    size_t i = 0;
+    for (Vertex& v : vertices_) {
+        array[i++] = v.x();
+        array[i++] = v.y();
+        array[i++] = v.z();
     }
-    return coords_array.data();
 }
 
-size_t* Triangulation::edgeSrcAndTgtAsArray() {
-    std::vector<size_t> idx_array;
-    for (HalfEdge e : halfedges_) {
-        idx_array.push_back(e.getSourceVertex());
-        idx_array.push_back(e.getTargetVertex());
+void Triangulation::fillEdgeVtxArray(size_t* array) {
+    size_t i = 0;
+    for (HalfEdge& e : halfedges_) {
+        array[i++] = e.getSourceVertex();
+        array[i++] = e.getTargetVertex();
     }
-    return idx_array.data();
 }
 
 

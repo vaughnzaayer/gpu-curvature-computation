@@ -9,7 +9,7 @@ __global__ void compEdgeLens(const size_t* dev_edges, const double* dev_coords, 
     if (i < n) {
         size_t v1_idx = dev_edges[i*2];
         size_t v2_idx = dev_edges[i*2 + 1];
-        double dist = sqrt(pow(dev_coords[v1_idx*3] - dev_coords[v2_idx*3],2.0) + pow(dev_coords[v1_idx*3 + 1] - dev_coords[v2_idx + 1],2.0) + pow(dev_coords[v1_idx*3 + 2]-dev_coords[v2_idx*3 + 2],2.0));
+        double dist = sqrt(pow(dev_coords[v1_idx*3] - dev_coords[v2_idx*3],2.0) + pow(dev_coords[v1_idx*3 + 1] - dev_coords[v2_idx*3 + 1],2.0) + pow(dev_coords[v1_idx*3 + 2]-dev_coords[v2_idx*3 + 2],2.0));
         dev_dest[i] = dist;
         printf("Idx: %d, Length Computed: %f \n", i, dist);
       }
@@ -80,8 +80,8 @@ int main(int argc, char** argv) {
     hipHostMalloc(&h_els, he_count*sizeof(double));
 
     // Assign host arrays
-    h_vs = mesh.coordsAsArray();
-    h_es = mesh.edgeSrcAndTgtAsArray();
+    mesh.fillCoordsArray(h_vs);
+    h_es = mesh.fillEdgeVtxArray(h_es);
 
     // Allocate device (GPU) memory
     hipMalloc(&d_vs, 3*vertex_count*sizeof(double));
