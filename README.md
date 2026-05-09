@@ -16,9 +16,17 @@ Note that you will need the minimum requirements of C++20 and CMAKE version 3.21
 cmake --build build
 ```
 
+### Building with HIP to use a GPU
+First, ensure you have the HIP compiler [installed](https://rocm.docs.amd.com/projects/HIP/en/docs-6.0.0/how_to_guides/install.html), as well as NIVIDA's CUDA or AMD's ROCm, depending on your hardware. In the project's root directory, run
+```
+hipcc -std=c++20 -I include/ -o hip_main src/main.hip src/halfedge2.cpp
+```
+
+Then, run using `./hip_main [filename.obj]`.
+
 ## Running
 To run the program, use
 ```
-./build/linear_curvature_computation [filename]
+./build/linear_curvature_computation [filename.obj]
 ```
 Without passing a filename, it will default to using `data/cube.obj`. Other options included are `data/bunny.obj` (which has 3300 vertices) and `data/cow.obj` (which has 400,000 vertices).
