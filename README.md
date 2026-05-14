@@ -16,7 +16,7 @@ Note that you will need the minimum requirements of C++20 and CMAKE version 3.21
 cmake --build build
 ```
 
-### Building with HIP to use a GPU
+### Building with HIP and CUDA to use a GPU
 First, ensure you have the HIP compiler [installed](https://rocm.docs.amd.com/projects/HIP/en/docs-6.0.0/how_to_guides/install.html), as well as NIVIDA's CUDA or AMD's ROCm, depending on your hardware. In the project's root directory, run
 ```
 hipcc -std=c++20 -I include/ -o hip_main src/main.hip src/halfedge2.cpp
@@ -41,3 +41,34 @@ Without passing a filename, it will default to using `data/cube.obj`. Other opti
 ## Known Bugs
 - The Gauss-Bonnet Theorem will read out as valid when compiled with HIP, but not with CUDA. However, the curvature values remain correct in both programs.
 - A SEGFAULT will occur when the input size is too big (for example, `data/cow.obj` will cause the program to crash).
+
+# Code Overview and Writeup
+
+This program contains two notable components: a basic implementation of a halfedge data structure (HEDS) and GPU kernel code for computing vertex Gaussian curvature. The HEDS implementation can be found under `include/halfedge2.hpp` and `src/halfedge2.cpp`. There are 3 `main` files: `main.cpp` (a basic linear vertex Gaussian curvature computation with a pointer-based HEDS), `main.hip` (a GPU implementation of the algorithm using AMD's HIP), and `main.cu` (the same GPU implementation but written in CUDA). Instructions for building and running the program are listed above.
+
+## Discrete Vertex Gaussian Curvature
+
+"Vertex Gaussian curvature" refers to the [angle defect](https://en.wikipedia.org/wiki/Angular_defect) around a vertex $i$, which is analogous to differential Gaussian curvature on a smooth surface. On a triangular mesh, computing the the curvature on a vertex only involves the edge lengths of the faces that include $i$. Assuming edge lengths have already been computed, the angle incident to $i$ on the neighboring face $f$ ($\theta_f^i$) can be computed using the Law of Cosines:
+$$
+\theta_f^i = \arccos(\frac{a^2+b^2-c^2}{2ab}),
+$$
+where $a, b$ are the lengths of the edges containing $i$ in the face $f$, and $c$ is the length of the edge opposite to $i$.
+
+After computing $\theta_f^i$ for each face neighboring $i$ (we denote this set of faces as $\mathcal{F}_i$), we compute the vertex Gaussian curvature at $i$ as 
+$$
+K_i = 2\pi - \sum_{f \in \mathcal{F}_i} \theta_f^i.
+$$
+
+## The Halfedge Data Structure (HEDS)
+
+To represent a mesh, I used a Halfedge Data Structure (HEDS). In a HEDS, a directional halfedge is used to connect vertices and denote orientation. Each vertex has a pointer to an outgoing halfedge. Halfedges themselves have pointers to the "next" halfedge, as well as their "twin."
+
+Given a triangular face containing vertices $i,j,k$, we can assign the halfedges $\vec{ij}, \vec{jk}, \vec{ki}$ to give a consistent orientation of the face. For the halfedge $\vec{ij}$, $\vec{ij}$`.next` $= \vec{jk}$ and $\vec{jk}$`.next` $= \vec{ki}$, so successively accessing `.next` on a halfedge traverses the face. $\vec{ij}$`.twin` $= \vec{ji}$, which connects the same two vertices but in the opposite direction. 
+
+With just these primitives, we can define an oriented mesh, as well as traverse it. In particular there are two operations we use to find $\mathcal{F}_i$. To find all outgoing edges from $i$, we track the initial $i$`.outgoingHE` and iteratively call `.twin.next` until we reach the initial edge again. Finding each face is similar --- for each outgoing halfedge of $i$, the second and third edges of each face are `.next` and `.next.next`, respectively. 
+
+### Pointer- vs. Index-Based HEDS
+A HEDS can come in two flavors: pointer-based and index-based. In a pointer-based structure, halfedges are referrenced directly by their memory address. This is pretty straightforward to implement, and allows us to leverage classes and structs in defining `Vertex` and `HalfEdge` objects. However --- as we will discuss later --- this implementation does not port easily to GPU memory architectures.
+
+In an index-based HEDS, we keep arrays to store vertex and halfedge information in sequence. Then, these elements are referenced by their index in their respective arrays. A good description of this is given by the [Geometry Central implementation](https://geometry-central.net/surface/surface_mesh/internals/). Compared to using pointers directly, this requires more manual memory management, and is potentially less memory-efficient. Moving the data onto a GPU is much easier in turn, though.
+
