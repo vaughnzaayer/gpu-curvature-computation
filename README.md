@@ -94,14 +94,27 @@ A high-level view of the HEDS can be found in [`include/halfedge2.hpp`](include/
     - `double` values to keep track of the vertex's `x`,`y`, and `z` coordinates in 3D Euclidean space ($\mathbb{R}^3$).
     - A variety of `get` and `set` methods.
 
-<!-- ### Converting from Pointer-Based to Index-Based HEDS
+We first instantiate a `Triangulation` object to manage the vertices and edges in a mesh. As long as the input is manifold and without boundary, `Triangulation` can use an `.obj` file to construct a HEDS for a mesh. To calculate the length of each halfedge, we iterate over each `HalfEdge` object in the `Triangulation`, then find the Euclidean distance between the coordinate positions of the source and destination vertices. Finding vertex curvatures is the same as described earlier --- use `halfedge.twin.next` and `halfedge.next` to find the adjacent faces, then compute the anfle defect. 
 
+### Converting from Pointer-Based to Index-Based HEDS
+Eventually, we will want to move parts of our `Triangulation` data to the GPU for parallel processing. Note that with a pointer-based structures, the addresses will not automatically line up when moved to the new GPU address space. Accessing class members or methods using `.` is also not possible on the GPU like on the CPU. Our solution is to "flatten" our data into standard C/C++ arrays, then copying those to and from the GPU. 
 
+Here is a diagram for halfedges in the pointer-based HEDS. 
+
+![A diagram showing how halfedges in a pointer-based HEDS are stored in memory.](diagrams/ptr_heds_diagram.png)
+
+In order to access a halfedge's neighbor, for example, we would need to access the `HalfEdge* twin` member and dereference the pointer. Each index in the array also references an entire `HalfEdge` object. Here is a diagram of the "flattened" version.
+
+![A diagram showing how halfedges in a index-based HEDS are stored in memory.](diagrams/idx_heds_diagram.png)
 
 ## Using the GPU with HIP/CUDA
+
+### Finding Edge Lengths on the GPU
+
+### Finding Vertex Curvature on the GPU
 
 
 ### Debugging GPU Code
 
 
-# Results and Further Directions -->
+# Results and Further Directions
