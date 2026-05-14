@@ -3,14 +3,6 @@
 #include "CLI11.hpp"
 #include <hip/hip_runtime.h>
 
-double GPUClamp(double x) {
-    if (x>= 0) {
-        return __saturatef(x);
-    } else {
-        return (-1.0 * __saturatef(x));
-    }
-}
-
 
 __global__ 
 void compEdgeLens(const size_t* dev_edges, 
@@ -43,7 +35,7 @@ void compVertexCurvature(const size_t* dev_edges,
     // memory to allocate
     int k = 0;
     do {
-        k++
+        k++;
     } while (curr_he != init_he);
 
     // for the second loop, we can allocate the memory we need and store the 
@@ -65,16 +57,16 @@ void compVertexCurvature(const size_t* dev_edges,
     double angle_def = 2.0 * M_PI;
     for (j = 0; j < k; j++) {
         // get each edge of the face
-        size_t e1 = neigbors[j];
+        size_t e1 = neighbors[j];
         size_t e2 = dev_edges[e1 + 3]; // e1.next
         size_t e3 = dev_edges[e2 + 3]; // e2.next
         
-        // auto cos_angle = std::clamp((std::pow(face_edge_lens[e], 2) + std::pow(face_edge_lens[e+2], 2) - std::pow(face_edge_lens[e+1], 2)) / (2 * face_edge_lens[e] * face_edge_lens[e+2]), -1.0, 1.0);
-        //     incident_angles.push_back(std::acos(cos_angle));
-        // use the law of cosines to compute the interior angle at vertex i
-        double cos_angle = GPUClamp(
-            (pow(dev_edge_lens[e1], 2.0) + pow(dev_edge_lens[e3], 2.0) - pow(dev_edge_lens[e2], 2.0)) / (2 * dev_edge_lens[e1] * dev_edge_lens[e3])
-        );
+        double cos_angle = (pow(dev_edge_lens[e1], 2.0) + pow(dev_edge_lens[e3], 2.0) - pow(dev_edge_lens[e2], 2.0)) / (2 * dev_edge_lens[e1] * dev_edge_lens[e3]);
+        if (cos_angle >= 0.0) {
+            cos_angle = __saturatef(cos_angle);
+          } else {
+            cos_angle = -1.0 * __saturatef(cos_angle);
+          }
         angle_def -= acos(cos_angle);
     }
 
@@ -129,7 +121,7 @@ int main(int argc, char** argv) {
     // Get GPU-friendly data
     GPUTriangulation gpu_mesh{vertex_count, he_count};
     gpu_mesh.inputVertexData(mesh.getVertices());
-    gpu_mesh.inputHalfedgeData(mesh.getVertices());
+    gpu_mesh.inputHalfedgeData(mesh.getHalfedges());
 
 
     // Pointers for host memory
@@ -197,7 +189,7 @@ int main(int argc, char** argv) {
     hipDeviceSynchronize();
 
     // Memcopy device -> host
-    hipMemcpy(h_vcurv, v_vcurv, vertex_count*sizeof(double), hipMemcpyDefault);
+    hipMemcpy(h_vcurv, d_vcurv, vertex_count*sizeof(double), hipMemcpyDefault);
 
 
     std::cout << "Edge lengths: ";
