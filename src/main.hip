@@ -3,6 +3,23 @@
 #include "CLI11.hpp"
 #include <hip/hip_runtime.h>
 
+__device__ __host__
+void printArray(const size_t* idx_arr, size_t len) {
+  printf("Printing array... \n");
+  for (size_t i = 0; i < len; i++) {
+    printf("%zu ", idx_arr[i]);
+  }
+  printf("\n Done! \n");
+}
+
+__device__ __host__
+void printArray(const double* idx_arr, size_t len) {
+  printf("Printing array... \n");
+  for (size_t i = 0; i < len; i++) {
+    printf("%f ", idx_arr[i]);
+  }
+  printf("\n Done! \n");
+}
 
 __global__ 
 void compEdgeLens(const size_t* dev_edges, 
@@ -40,13 +57,19 @@ void compVertexCurvature(const size_t* dev_edges,
 
     // for the second loop, we can allocate the memory we need and store the 
     // adjacent outgoing halfedges
-    size_t neighbors[k];
+    size_t neighbors[3];
     curr_he = init_he;
     int j = 0;
+
+    if (i == 0) {
+      printf("current he: %zu\n", curr_he);
+      printf("next he: %zu\n", dev_edges[curr_he + 2]);
+    }
     do {
         neighbors[j] = curr_he;
         curr_he = dev_edges[dev_edges[curr_he + 2] + 3]; // curr = curr.twin.next
         j++;
+        printf("j val: %d", j);
     } while (curr_he != init_he);
     
     // for each outgoing halfedge, record the last two halfedges of 
@@ -55,13 +78,14 @@ void compVertexCurvature(const size_t* dev_edges,
     // i.e. compute discrete Gaussian curvature via angle defect:
     // K = 2 * PI - sum(angles)
     double angle_def = 2.0 * M_PI;
-    for (j = 0; j < k; j++) {
+    for (j = 0; j < 3; j++) {
         // get each edge of the face
         size_t e1 = neighbors[j];
         size_t e2 = dev_edges[e1 + 3]; // e1.next
         size_t e3 = dev_edges[e2 + 3]; // e2.next
         
         double cos_angle = (pow(dev_edge_lens[e1], 2.0) + pow(dev_edge_lens[e3], 2.0) - pow(dev_edge_lens[e2], 2.0)) / (2 * dev_edge_lens[e1] * dev_edge_lens[e3]);
+        printf("cos_angle: %f", cos_angle);
         if (cos_angle >= 0.0) {
             cos_angle = __saturatef(cos_angle);
           } else {
@@ -71,7 +95,7 @@ void compVertexCurvature(const size_t* dev_edges,
     }
 
     // writeback the curvature value to the destination array
-    dev_dest[i];
+    dev_dest[i] = angle_def;
 }
 
 int main(int argc, char** argv) {
@@ -123,6 +147,7 @@ int main(int argc, char** argv) {
     gpu_mesh.inputVertexData(mesh.getVertices());
     gpu_mesh.inputHalfedgeData(mesh.getHalfedges());
 
+    printArray(gpu_mesh.vertexHalfedges(), vertex_count);
 
     // Pointers for host memory
     double* h_coords = nullptr;
@@ -179,6 +204,8 @@ int main(int argc, char** argv) {
     hipFree(d_coords);
 
     // // Vertex curvature computation // //
+
+    hipDeviceReset();
 
     // Memcopy host -> device
     hipMemcpy(d_vhalfed, h_vhalfed, vertex_count*sizeof(size_t), hipMemcpyDefault);
