@@ -111,5 +111,36 @@ struct Triangulation {
         double* vertCurvaturesAsArray();
 
         void fillCoordsArray(double* array);
-        void fillEdgeVtxArray(size_t* array);
+        void fillEdgeArray(size_t* array);
 };
+
+struct GPUTriangulation {
+    private:
+      size_t n_, m_;
+      size_t* vertex_he_;
+      size_t* halfedges_;
+      double* vert_coords_;
+      double* he_lengths_;      // this will contain duplicated data -- a halfedge and its twin have the same length
+      double* vert_curvatures_;
+    public:
+      GPUTriangulation(size_t vertex_count, size_t edge_count);
+      
+      void inputVertexData(std::vector<Vertex>* in);
+      void inputHalfedgeData(std::vector<HalfEdge>* in);
+  
+      size_t getVertexCount();
+      size_t getEdgeCount();
+  
+      size_t* vertexHalfedges();
+      size_t* halfedges();
+      double* vertexCoordinates();
+      double* halfedgeLengths();
+      double* vertexCurvatures();
+  
+      template <typename T>
+      void fillArrayData(size_t length, T* src, T* tgt) {
+        for (size_t i = 0; i < length; i++) {
+            tgt[i] = src[i];
+        }
+      }
+  };

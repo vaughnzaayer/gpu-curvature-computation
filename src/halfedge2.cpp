@@ -221,11 +221,13 @@ void Triangulation::fillCoordsArray(double* array) {
     }
 }
 
-void Triangulation::fillEdgeVtxArray(size_t* array) {
+void Triangulation::fillEdgeArray(size_t* array) {
     size_t i = 0;
     for (HalfEdge& e : halfedges_) {
         array[i++] = e.getSourceVertex();
         array[i++] = e.getTargetVertex();
+        array[i++] = e.getTwinHalfedge();
+        array[i++] = e.getNextHalfedge();
     }
 }
 
@@ -332,3 +334,74 @@ size_t HalfEdge::getNextHalfedge() {
 void HalfEdge::setNextHalfedge(size_t next_id) {
     next_ = next_id;
 }
+
+
+///////////////////////////////////////////////////////////
+//               GPUTriangulation Methods                //
+///////////////////////////////////////////////////////////
+
+GPUTriangulation::GPUTriangulation(size_t vertex_count, size_t edge_count) {
+    n_ = vertex_count;
+    m_ = edge_count;
+}
+
+void GPUTriangulation::inputVertexData(std::vector<Vertex>* in) {
+    // Allocate the necessary memory based on the number of vertices
+    double* tmp_coords      = new double[3 * n_];
+    double* tmp_curvatures  = new double[3 * n_];
+    size_t* tmp_halfedges   = new size_t[n_];
+    
+    size_t itr = 0;
+    for (Vertex v : *in) {
+        // load (x,y,z) coords into coord array
+        tmp_coords[itr * 3]     = v.x();
+        tmp_coords[itr * 3 + 1] = v.y();
+        tmp_coords[itr * 3 + 2] = v.z();
+
+        // set curvature value at zero since we're calculating that on the GPU anyways
+        tmp_curvatures[itr] = 0.0;
+
+        // add the halfedge idx associated with the vertex to the halfedge array
+        tmp_halfedges[itr] = v.getHalfedge();
+
+        itr++;
+    }
+
+    // pass these pointers for the struct to keep track of
+    vert_coords_ = tmp_coords;
+    vertex_he_ = tmp_halfedges;
+    vert_curvatures_ = tmp_curvatures;
+}
+
+void GPUTriangulation::inputHalfedgeData(std::vector<HalfEdge>* in) {
+    // allocate the necessary memory based on the number of edges
+    size_t* tmp_halfedges       = new size_t[4 * m_];
+    double* tmp_halfedge_lens   = new double[m_];
+
+    size_t itr = 0;
+    for (HalfEdge he : *in) {
+        // add halfedge data to halfedge array
+        tmp_halfedges[itr * 4]      = he.getSourceVertex();
+        tmp_halfedges[itr * 4 + 1]  = he.getTargetVertex();
+        tmp_halfedges[itr * 4 + 2]  = he.getTwinHalfedge();
+        tmp_halfedges[itr * 4 + 3]  = he.getNextHalfedge();
+
+        // set length value at zero since we're calculating that on the GPU anyways
+        tmp_halfedge_lens[itr] = 0.0;
+
+        itr++;
+    }
+
+    // pass these pointers for the struct to keep track of
+    halfedges_ = tmp_halfedges;
+    he_lengths_ = tmp_halfedge_lens;
+}
+
+size_t GPUTriangulation::getVertexCount() {return n_;}
+size_t GPUTriangulation::getEdgeCount() {return m_;}
+
+size_t* GPUTriangulation::vertexHalfedges() {return vertex_he_;}
+size_t* GPUTriangulation::halfedges() {return halfedges_;}
+double* GPUTriangulation::vertexCoordinates() {return vert_coords_;}
+double* GPUTriangulation::halfedgeLengths() {return he_lengths_;}
+double* GPUTriangulation::vertexCurvatures() {return vert_curvatures_;}
