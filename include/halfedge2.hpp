@@ -84,6 +84,7 @@ struct Triangulation {
         std::unordered_map<std::tuple<size_t, size_t>, size_t, TupleHash> edge_map_;
         std::vector<double> edge_lengths_;
         std::vector<double> vertex_curvatures_;
+        size_t n_faces_;
     public:
         std::vector<Vertex>* getVertices();
         std::vector<HalfEdge>* getHalfedges();
@@ -104,6 +105,7 @@ struct Triangulation {
 
         size_t getVertexCount();
         size_t getHalfedgeCount();
+        size_t getFaceCount();
 
         Vertex* verticesAsArray();
         HalfEdge* halfedgesAsArray();

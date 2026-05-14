@@ -1,4 +1,6 @@
 #include <iostream>
+#include <algorithm>
+#include <array>
 #include "halfedge2.hpp"
 #include "CLI11.hpp"
 #include <hip/hip_runtime.h>
@@ -36,7 +38,7 @@ void compEdgeLens(const size_t* dev_edges,
 }
 
 __global__ 
-void compVertexCurvature(const size_t* dev_edges, 
+void compVertexCurvature(const size_t* dev_edges,
     const size_t* dev_vert_he, 
     const double* dev_edge_lens, 
     double* dev_dest, 
@@ -44,85 +46,40 @@ void compVertexCurvature(const size_t* dev_edges,
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     double angle_defect = 2 * M_PI;
     
+    if (i < n) {
+
     size_t init_he = dev_vert_he[i];
     size_t curr_he = init_he;
     
     do {
         size_t e1 = curr_he;
-        size_t e2 = dev_edges[e1 + 3]; // e1.next
-        size_t e3 = dev_edges[e2 + 3]; // e2.next
+        size_t e2 = dev_edges[curr_he + 3];
+        size_t e3 = dev_edges[e2 + 3];
 
-        double cos_angle = (pow(dev_edge_lens[e1], 2.0) + pow(dev_edge_lens[e3], 2.0) - pow(dev_edge_lens[e2], 2.0)) / (2 * dev_edge_lens[e1] * dev_edge_lens[e3]);
+
+        double len_e1 = dev_edge_lens[e1 / 4];
+        double len_e2 = dev_edge_lens[e2 / 4];
+        double len_e3 = dev_edge_lens[e3 / 4];
+
+        double cos_angle = (pow(len_e1, 2.0) + pow(len_e3, 2.0) - pow(len_e2, 2.0)) / (2 * len_e1 * len_e3);
         
-        printf("cos_angle: %f", cos_angle);
-        
+            
         if (cos_angle >= 0.0) {
             cos_angle = __saturatef(cos_angle);
-          } else {
-            cos_angle = __saturatef(-cos_angle);
-          }
+        } else {
+            cos_angle = -__saturatef(-cos_angle);
+        }
 
         angle_defect -= acos(cos_angle);
-        curr_he = dev_edges[dev_edges[curr_he + 2] + 3];
-
-
+        auto twin = dev_edges[curr_he + 2];
+        auto twin_next = dev_edges[twin + 3];
+        curr_he = twin_next;
+      
     } while (curr_he != init_he);
     
     // writeback the curvature value to the destination array
-    dev_dest[i] = angle_def;
-    // // get all outgoing halfedges with he.twin.next loop
-    // size_t init_he = dev_vert_he[i];
-    // size_t curr_he = init_he;
-    // size_t next_he = dev_edges[dev_edges[curr_he + 2] + 3]; // next = curr.twin.next
-    
-    // // for first loop, we need a complete traversal in order to know how much
-    // // memory to allocate
-    // int k = 0;
-    // do {
-
-    //     k++;
-    // } while (curr_he != init_he);
-
-    // // for the second loop, we can allocate the memory we need and store the 
-    // // adjacent outgoing halfedges
-    // size_t neighbors[3];
-    // curr_he = init_he;
-    // int j = 0;
-
-    // if (i == 0) {
-    //   printf("current he: %zu\n", curr_he);
-    //   printf("next he: %zu\n", dev_edges[curr_he + 2]);
-    // }
-    // do {
-    //     neighbors[j] = curr_he;
-    //     curr_he = dev_edges[dev_edges[curr_he + 2] + 3]; // curr = curr.twin.next
-    //     j++;
-    //     printf("j val: %d", j);
-    // } while (curr_he != init_he);
-    
-    // // for each outgoing halfedge, record the last two halfedges of 
-    // // the face to the array, find the corresponding lengths, compute 
-    // // the incident angle of that face, and subtract that from 2 * PI
-    // // i.e. compute discrete Gaussian curvature via angle defect:
-    // // K = 2 * PI - sum(angles)
-    // double angle_def = 2.0 * M_PI;
-    // for (j = 0; j < 3; j++) {
-    //     // get each edge of the face
-    //     size_t e1 = neighbors[j];
-    //     size_t e2 = dev_edges[e1 + 3]; // e1.next
-    //     size_t e3 = dev_edges[e2 + 3]; // e2.next
-        
-    //     double cos_angle = (pow(dev_edge_lens[e1], 2.0) + pow(dev_edge_lens[e3], 2.0) - pow(dev_edge_lens[e2], 2.0)) / (2 * dev_edge_lens[e1] * dev_edge_lens[e3]);
-    //     printf("cos_angle: %f", cos_angle);
-    //     if (cos_angle >= 0.0) {
-    //         cos_angle = __saturatef(cos_angle);
-    //       } else {
-    //         cos_angle = -1.0 * __saturatef(cos_angle);
-    //       }
-    //     angle_def -= acos(cos_angle);
-    // }
-
-    
+    dev_dest[i] = angle_defect;
+  }
 }
 
 int main(int argc, char** argv) {
@@ -166,15 +123,13 @@ int main(int argc, char** argv) {
 
     std::cout << "Computing Using GPU:" << std::endl;
 
-    size_t vertex_count = mesh.getVertexCount();
-    size_t he_count = mesh.getHalfedgeCount();
+    size_t vertex_count = vertices->size();
+    size_t he_count = halfedges->size();
 
     // Get GPU-friendly data
     GPUTriangulation gpu_mesh{vertex_count, he_count};
     gpu_mesh.inputVertexData(mesh.getVertices());
     gpu_mesh.inputHalfedgeData(mesh.getHalfedges());
-
-    printArray(gpu_mesh.vertexHalfedges(), vertex_count);
 
     // Pointers for host memory
     double* h_coords = nullptr;
@@ -198,13 +153,13 @@ int main(int argc, char** argv) {
     hipHostMalloc(&h_elens, he_count*sizeof(double));
 
     // Assign host arrays
-    mesh.fillCoordsArray(h_coords);
-    mesh.fillEdgeArray(h_edges);
+    gpu_mesh.fillArrayData(vertex_count * 3, gpu_mesh.vertexCoordinates(), h_coords);
+    gpu_mesh.fillArrayData(he_count * 4, gpu_mesh.halfedges(), h_edges);
     gpu_mesh.fillArrayData(vertex_count, gpu_mesh.vertexHalfedges(), h_vhalfed);
 
     // Allocate device (GPU) memory
     hipMalloc(&d_coords, 3*vertex_count*sizeof(double));
-    hipMalloc(&h_vhalfed, vertex_count*sizeof(size_t));
+    hipMalloc(&d_vhalfed, vertex_count*sizeof(size_t));
     hipMalloc(&d_edges, 4*he_count*sizeof(size_t));
     hipMalloc(&d_vcurv, vertex_count*sizeof(double));
     hipMalloc(&d_elens, he_count*sizeof(double));
@@ -225,10 +180,8 @@ int main(int argc, char** argv) {
     // Memcopy device -> host
     hipMemcpy(h_elens, d_elens, he_count*sizeof(double), hipMemcpyDefault);
 
-    // Free host and device memory for coords --- the next computation doesn't
-    // require it
-    hipFreeHost(h_coords);
-    hipFree(d_coords);
+    double edge_lengths[he_count];
+    hipMemcpy(edge_lengths, h_elens, he_count*sizeof(double), hipMemcpyDefault);
 
     // // Vertex curvature computation // //
 
@@ -243,13 +196,13 @@ int main(int argc, char** argv) {
     hipHostMalloc(&h_elens, he_count*sizeof(double));
 
     // Assign host arrays
-    mesh.fillCoordsArray(h_coords);
-    mesh.fillEdgeArray(h_edges);
+    gpu_mesh.fillArrayData(vertex_count * 3, gpu_mesh.vertexCoordinates(), h_coords);
+    gpu_mesh.fillArrayData(he_count * 4, gpu_mesh.halfedges(), h_edges);
     gpu_mesh.fillArrayData(vertex_count, gpu_mesh.vertexHalfedges(), h_vhalfed);
 
     // Allocate device (GPU) memory
     hipMalloc(&d_coords, 3*vertex_count*sizeof(double));
-    hipMalloc(&h_vhalfed, vertex_count*sizeof(size_t));
+    hipMalloc(&d_vhalfed, vertex_count*sizeof(size_t));
     hipMalloc(&d_edges, 4*he_count*sizeof(size_t));
     hipMalloc(&d_vcurv, vertex_count*sizeof(double));
     hipMalloc(&d_elens, he_count*sizeof(double));
@@ -257,6 +210,9 @@ int main(int argc, char** argv) {
     // Memcopy host -> device
     hipMemcpy(d_edges, h_edges, 4*he_count*sizeof(size_t), hipMemcpyDefault);
     hipMemcpy(d_vhalfed, h_vhalfed, vertex_count*sizeof(size_t), hipMemcpyDefault);
+    hipMemcpy(d_elens, edge_lengths, he_count*sizeof(double), hipMemcpyDefault);
+
+    
 
     // Call kernel
     compVertexCurvature<<<blocks, threads_per_block>>>(d_edges, d_vhalfed, d_elens, d_vcurv, vertex_count);
@@ -265,11 +221,11 @@ int main(int argc, char** argv) {
 
     // Memcopy device -> host
     hipMemcpy(h_vcurv, d_vcurv, vertex_count*sizeof(double), hipMemcpyDefault);
-
+    hipGetLastError();
 
     std::cout << "Edge lengths: ";
     for(size_t i = 0; i < he_count; i++) {
-        std::cout << h_elens[i] << " ";
+        std::cout << edge_lengths[i] << " ";
     }
     std::cout << std::endl;
 
@@ -278,6 +234,27 @@ int main(int argc, char** argv) {
         std::cout << h_vcurv[i] << " ";
     }
     std::cout << std::endl;
+
+    // Validating using the Gauss-Bonnet Theorem
+    int f = int(mesh.getFaceCount());
+    int v = int(mesh.getVertexCount());
+    int e = int(mesh.getHalfedgeCount()) / 2;
+    int euler_char = v - e + f;
+
+    double total_curvature = 0;
+
+    for (size_t i = 0; i < vertex_count; i++) {
+        total_curvature += h_vcurv[i];
+    }
+
+    auto diff = std::abs(2 * M_PI * double(euler_char) - total_curvature);
+    if (diff < 1e-5) {
+        printf("Gauss-Bonnet Theorem valid.\n");
+    } else {
+        printf("Gauss-Bonnet Theorem invalid.\n");
+    }
+
+
 
     hipDeviceReset();
 

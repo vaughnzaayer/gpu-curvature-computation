@@ -104,6 +104,8 @@ void Triangulation::loadFromObj(std::string inputfile) {
                     halfedges_[face_edges[i]].setNextHalfedge(face_edges[0]);
                 }
             }
+
+            n_faces_++;
         }
     }
 }
@@ -194,6 +196,10 @@ size_t Triangulation::getVertexCount() {
 
 size_t Triangulation::getHalfedgeCount() {
     return halfedges_.size();
+}
+
+size_t Triangulation::getFaceCount() {
+    return n_faces_;
 }
 
 Vertex* Triangulation::verticesAsArray() {
@@ -362,7 +368,7 @@ void GPUTriangulation::inputVertexData(std::vector<Vertex>* in) {
         tmp_curvatures[itr] = 0.0;
 
         // add the halfedge idx associated with the vertex to the halfedge array
-        tmp_halfedges[itr] = v.getHalfedge();
+        tmp_halfedges[itr] = v.getHalfedge() * 4;
 
         itr++;
     }
@@ -383,8 +389,8 @@ void GPUTriangulation::inputHalfedgeData(std::vector<HalfEdge>* in) {
         // add halfedge data to halfedge array
         tmp_halfedges[itr * 4]      = he.getSourceVertex();
         tmp_halfedges[itr * 4 + 1]  = he.getTargetVertex();
-        tmp_halfedges[itr * 4 + 2]  = he.getTwinHalfedge();
-        tmp_halfedges[itr * 4 + 3]  = he.getNextHalfedge();
+        tmp_halfedges[itr * 4 + 2]  = he.getTwinHalfedge() * 4;
+        tmp_halfedges[itr * 4 + 3]  = he.getNextHalfedge() * 4;
 
         // set length value at zero since we're calculating that on the GPU anyways
         tmp_halfedge_lens[itr] = 0.0;
