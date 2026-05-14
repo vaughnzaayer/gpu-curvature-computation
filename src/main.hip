@@ -207,7 +207,28 @@ int main(int argc, char** argv) {
 
     hipDeviceReset();
 
+    // Reallocate memory
+    // Allocate host memory via HIP
+    hipHostMalloc(&h_coords, 3*vertex_count*sizeof(double));
+    hipHostMalloc(&h_vhalfed, vertex_count*sizeof(size_t));
+    hipHostMalloc(&h_edges, 4*he_count*sizeof(size_t));
+    hipHostMalloc(&h_vcurv, vertex_count*sizeof(double));
+    hipHostMalloc(&h_elens, he_count*sizeof(double));
+
+    // Assign host arrays
+    mesh.fillCoordsArray(h_coords);
+    mesh.fillEdgeArray(h_edges);
+    gpu_mesh.fillArrayData(vertex_count, gpu_mesh.vertexHalfedges(), h_vhalfed);
+
+    // Allocate device (GPU) memory
+    hipMalloc(&d_coords, 3*vertex_count*sizeof(double));
+    hipMalloc(&h_vhalfed, vertex_count*sizeof(size_t));
+    hipMalloc(&d_edges, 4*he_count*sizeof(size_t));
+    hipMalloc(&d_vcurv, vertex_count*sizeof(double));
+    hipMalloc(&d_elens, he_count*sizeof(double));
+
     // Memcopy host -> device
+    hipMemcpy(d_edges, h_edges, 4*he_count*sizeof(size_t), hipMemcpyDefault);
     hipMemcpy(d_vhalfed, h_vhalfed, vertex_count*sizeof(size_t), hipMemcpyDefault);
 
     // Call kernel
