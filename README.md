@@ -24,6 +24,13 @@ hipcc -std=c++20 -I include/ -o hip_main src/main.hip src/halfedge2.cpp
 
 Then, run using `./hip_main [filename.obj]`.
 
+To use purely CUDA, compile with this instead:
+```
+nvcc -std=c++20 -I include/ -o cuda_main src/main.cu src/halfedge2.cpp
+```
+
+Then, run using `./cuda_main [filename.obj]`.
+
 ## Running
 To run the program, use
 ```
