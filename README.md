@@ -107,14 +107,35 @@ In order to access a halfedge's neighbor, for example, we would need to access t
 
 ![A diagram showing how halfedges in a index-based HEDS are stored in memory.](diagrams/idx_heds_diagram.png)
 
+Now we can access any basic information associated with a `HalfEdge` by indexing into the array (where the start of each halfedge is at an index which is a power of 4) and adding an offset. For example, if we want to get the halfedge twin index from the halfedge at index `1`, we would use `twin_idx = halfedges[1 * 4] + 2`. To add attributes like edge length to a halfedge, we simply make a new array where the indices correspond correctly to `halfedges`. So, if we wanted to retrieve the length of the twin halfedge we just found, we would use `edge_lengths[twin_idx]`. 
+
+Switching to an index-based HEDS gives us the flexibility to easily move our data to and from the GPU memory, and also allows us to add scalar attributes without needing to reallocate or scale an existing array.
+
 ## Using the GPU with HIP/CUDA
+Both HIP and CUDA have very robust C++ bindings that fold into existing projects easily. Since this code was written and tested primarily with an AMD GPU (RDNA3 architecture), we will describe GPU operations with AMD's HIP runtime. Conveniently, the HIP bindings are essentially CUDA bindings that swap the word `cuda` with `hip`, allowing for incredibly easy conversion between the two runtimes. In fact, the [HIPIFY tool](https://rocm.docs.amd.com/projects/HIPIFY/en/latest/) can convert CUDA code to HIP code without needing the CUDA runtime installed. The HIP compiler can also produce CUDA binaries. More information about the similarity between HIP and CUDA can be found [here](https://rocm.docs.amd.com/projects/HIP/en/latest/reference/api_syntax.html).
+
+Code executed on the GPU is written as a *kernel*, which is compiled specifically for the GPU architecture. Kernels are written just the same as normal functions in C++, except they must
+- be marked as `__global__`, `__device__`, `__host__`, etc. to tell the compiler where the code will be run,
+- return `void`,
+- and only access memory that has been preallocated to their respective device.
+
+Executing a kernel can be done with a `hipLaunchKernel(kernel)` function or with the triple-chevron syntax `kernel<<<blocks, threads_per_block>>>()`. 
 
 ### Finding Edge Lengths on the GPU
+To compute the edge lengths using the GPU, we take the following steps:
+1. Let n,m be the vertex count and edge count respectively. We allocate a `double` array of size m on both the host and device to store our length values.
+2. We also allocate a `double` array of size 3 x n to store each coordinate value of every vertex. Finally, we allocate a `size_t` array of size 4 x m to store our halfedges and their reference index values.
+3. We use `hipMemCopy()` to copy all values from the host to the device.
+4. Each thread on the GPU is assigned to a halfedge, where it takes the coordinate values for the source and destination vertices and computes the Euclidean distance. The distance value is then written to the edge length array in device memory.
+5. We call `hipDeviceSynchronize()` to make sure every thread finishes their task. After they are all done, we use `hipMemCopy()` to copy the edge length array on the device back to the host's memory.
+6. Finally, we can call `hipDeviceReset()` to clear the threads and memory of the GPU. We could instead free memory and reset the thread index manually, but use reset for the sake of simplicity.
+
 
 ### Finding Vertex Curvature on the GPU
 
 
 ### Debugging GPU Code
+
 
 
 # Results and Further Directions
