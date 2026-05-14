@@ -37,3 +37,7 @@ To run the program, use
 ./build/linear_curvature_computation [filename.obj]
 ```
 Without passing a filename, it will default to using `data/cube.obj`. Other options included are `data/bunny.obj` (which has 3300 vertices) and `data/cow.obj` (which has 400,000 vertices).
+
+## Known Bugs
+- The Gauss-Bonnet Theorem will read out as valid when compiled with HIP, but not with CUDA. However, the curvature values remain correct in both programs.
+- A SEGFAULT will occur when the input size is too big (for example, `data/cow.obj` will cause the program to crash).
