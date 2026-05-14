@@ -44,7 +44,7 @@ Without passing a filename, it will default to using `data/cube.obj`. Other opti
 
 # Code Overview and Writeup
 
-This program contains two notable components: a basic implementation of a halfedge data structure (HEDS) and GPU kernel code for computing vertex Gaussian curvature. The HEDS implementation can be found under `include/halfedge2.hpp` and `src/halfedge2.cpp`. There are 3 `main` files: `main.cpp` (a basic linear vertex Gaussian curvature computation with a pointer-based HEDS), `main.hip` (a GPU implementation of the algorithm using AMD's HIP), and `main.cu` (the same GPU implementation but written in CUDA). Instructions for building and running the program are listed above.
+This program contains two notable components: a basic implementation of a halfedge data structure (HEDS) and GPU kernel code for computing vertex Gaussian curvature. The HEDS implementation can be found under [`include/halfedge2.hpp`](include/halfedge2.hpp) and [`src/halfedge2.cpp`](src/halfedge2.cpp). There are 3 `main` files: [`src/main.cpp`](src/main.cpp) (a basic linear vertex Gaussian curvature computation with a pointer-based HEDS), [`src/main.hip`](src/main.hip) (a GPU implementation of the algorithm using AMD's HIP), and [`src/main.cu`](src/main.cu) (the same GPU implementation but written in CUDA). Instructions for building and running the program are listed above.
 
 ## Discrete Vertex Gaussian Curvature
 
@@ -72,3 +72,36 @@ A HEDS can come in two flavors: pointer-based and index-based. In a pointer-base
 
 In an index-based HEDS, we keep arrays to store vertex and halfedge information in sequence. Then, these elements are referenced by their index in their respective arrays. A good description of this is given by the [Geometry Central implementation](https://geometry-central.net/surface/surface_mesh/internals/). Compared to using pointers directly, this requires more manual memory management, and is potentially less memory-efficient. Moving the data onto a GPU is much easier in turn, though.
 
+## HEDS Implementation Overview
+A high-level view of the HEDS can be found in [`include/halfedge2.hpp`](include/halfedge2.hpp). The three classes making up this HEDS are:
+- `Triangulation`
+    - Keeps a `std::vector` of all `Vertex` objects, and another for all `HalfEdge` objects.
+    - An `std::unordered_map` to keep track of which vertices $i$, $j$ have a halfedge connecting them (in either direction).
+    - More `std::vector` objects for keeping track of edge lengths and vertex curvatures.
+    - A variety of `get` and `set` methods.
+    - Method `Triangulation::loadFromObj()` for reading an `.obj` file using [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader).
+    - Methods for computing edge lengths and vertex curvatures.
+- `HalfEdge`
+    - Has a reference to its parent `Triangulation`.
+    - The `HalfEdge`'s index.
+    - Vertex indices for the source and destination vertices.
+    - Halfedge indices for the twin and next halfedges.
+    - A variety of `get` and `set` methods.
+- `Vertex`
+    - Has a reference to its parent `Triangulation`.
+    - The `Vertex`'s index.
+    - The index of an outgoing `Halfedge`.
+    - `double` values to keep track of the vertex's `x`,`y`, and `z` coordinates in 3D Euclidean space ($\mathbb{R}^3$).
+    - A variety of `get` and `set` methods.
+
+<!-- ### Converting from Pointer-Based to Index-Based HEDS
+
+
+
+## Using the GPU with HIP/CUDA
+
+
+### Debugging GPU Code
+
+
+# Results and Further Directions -->
