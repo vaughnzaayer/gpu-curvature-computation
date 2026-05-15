@@ -5,6 +5,8 @@
 #include "CLI11.hpp"
 #include <hip/hip_runtime.h>
 
+// A function that can print an array on either the GPU or CPU. 
+// Good for debugging!
 __device__ __host__
 void printArray(const size_t* idx_arr, size_t len) {
   printf("Printing array... \n");
@@ -23,54 +25,83 @@ void printArray(const double* idx_arr, size_t len) {
   printf("\n Done! \n");
 }
 
+// <KERNEL> compEdgeLens():
+// args:    cost size_t* dev_edges   ---    An array of halfedges stored on the GPU. Should be size 4 * m * size_t.
+//          cost size_t* dev_coords  ---    An array of vertex coordinates on the GPU. Should be size 3 * n * double.
+//               size_t* dev_dest    ---    An (empty) array of edge lengths on the GPU (this is where we will writeback our results).
+//                                          Should be size m * double.
+//               size_t  m           ---    Number of edges to process.
+//
 __global__ 
 void compEdgeLens(const size_t* dev_edges, 
     const double* dev_coords, 
     double* dev_dest, 
-    size_t n) {
+    size_t m) {
+    // get thread index
     int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i < n) {
+    // only run if the index of the thread is within range of the edge array
+    if (i < m) {
+        // get the vertex indices for the source and destination of the halfedge
         size_t v1_idx = dev_edges[i*4];
         size_t v2_idx = dev_edges[i*4 + 1];
+        // compute the standard Euclidean distance between the two coordinates
         double dist = sqrt(pow(dev_coords[v1_idx*3] - dev_coords[v2_idx*3],2.0) + pow(dev_coords[v1_idx*3 + 1] - dev_coords[v2_idx*3 + 1],2.0) + pow(dev_coords[v1_idx*3 + 2]-dev_coords[v2_idx*3 + 2],2.0));
+        // writeback the edge values to the edge length array
         dev_dest[i] = dist;
     }
 }
 
+// <KERNEL> compVertexCurvature():
+// args:    cost size_t* dev_edges      ---    An array of halfedges stored on the GPU. Should be size 4 * m * size_t.
+// args:    cost size_t* dev_vert_he    ---    An array of halfedges stored on the GPU, with each halfedge being associated with a vertex. 
+//                                             Should be size n * size_t.
+//          cost size_t* dev_edge_lens  ---    An array of (computed) edge lengths on the GPU. Should be size 4 * double.
+//               size_t* dev_dest       ---    An (empty) array of vertex curvatures on the GPU (this is where we will writeback our results).
+//                                             Should be size n * double.
+//               size_t  n              ---    Number of vertices to process.
+//
 __global__ 
 void compVertexCurvature(const size_t* dev_edges,
     const size_t* dev_vert_he, 
     const double* dev_edge_lens, 
     double* dev_dest, 
     size_t n) {
+    // get thread index
     int i = blockDim.x * blockIdx.x + threadIdx.x;
+    // initialize angle defect at 2 * PI (a full circle)
     double angle_defect = 2 * M_PI;
     
+    // only run if the index of the thread is within range of the edge array
     if (i < n) {
 
+    // track the initial outgoing halfedge from vertex i
     size_t init_he = dev_vert_he[i];
     size_t curr_he = init_he;
     
     do {
+        // get the indices for each edge in the current face
         size_t e1 = curr_he;
         size_t e2 = dev_edges[curr_he + 3];
         size_t e3 = dev_edges[e2 + 3];
 
-
+        // get the corresponding edge lengths for each
         double len_e1 = dev_edge_lens[e1 / 4];
         double len_e2 = dev_edge_lens[e2 / 4];
         double len_e3 = dev_edge_lens[e3 / 4];
 
+        // use the law of cosines to get the cosine of the incident angle
         double cos_angle = (pow(len_e1, 2.0) + pow(len_e3, 2.0) - pow(len_e2, 2.0)) / (2 * len_e1 * len_e3);
         
-            
+        // clamp the value of the cosine angle to [-1.0, 1.0]
         if (cos_angle >= 0.0) {
             cos_angle = __saturatef(cos_angle);
         } else {
             cos_angle = -__saturatef(-cos_angle);
         }
 
+        // subtract this angle from the total 
         angle_defect -= acos(cos_angle);
+        // iterate to the next outgoing halfedge using curr.twin.next
         auto twin = dev_edges[curr_he + 2];
         auto twin_next = dev_edges[twin + 3];
         curr_he = twin_next;
