@@ -68,7 +68,7 @@ Given a triangular face containing vertices $i,j,k$, we can assign the halfedges
 With just these primitives, we can define an oriented mesh, as well as traverse it. In particular there are two operations we use to find $\mathcal{F}_i$. To find all outgoing edges from $i$, we track the initial $i$`.outgoingHE` and iteratively call `.twin.next` until we reach the initial edge again. Finding each face is similar --- for each outgoing halfedge of $i$, the second and third edges of each face are `.next` and `.next.next`, respectively. 
 
 ### Pointer- vs. Index-Based HEDS
-A HEDS can come in two flavors: pointer-based and index-based. In a pointer-based structure, halfedges are referrenced directly by their memory address. This is pretty straightforward to implement, and allows us to leverage classes and structs in defining `Vertex` and `HalfEdge` objects. However --- as we will discuss later --- this implementation does not port easily to GPU memory architectures.
+A HEDS can come in two flavors: pointer-based and index-based. In a pointer-based structure, halfedges are referenced directly by their memory address. This is pretty straightforward to implement, and allows us to leverage classes and structs in defining `Vertex` and `HalfEdge` objects. However --- as we will discuss later --- this implementation does not port easily to GPU memory architectures.
 
 In an index-based HEDS, we keep arrays to store vertex and halfedge information in sequence. Then, these elements are referenced by their index in their respective arrays. A good description of this is given by the [Geometry Central implementation](https://geometry-central.net/surface/surface_mesh/internals/). Compared to using pointers directly, this requires more manual memory management, and is potentially less memory-efficient. Moving the data onto a GPU is much easier in turn, though.
 
@@ -94,7 +94,7 @@ A high-level view of the HEDS can be found in [`include/halfedge2.hpp`](include/
     - `double` values to keep track of the vertex's `x`,`y`, and `z` coordinates in 3D Euclidean space ($\mathbb{R}^3$).
     - A variety of `get` and `set` methods.
 
-We first instantiate a `Triangulation` object to manage the vertices and edges in a mesh. As long as the input is manifold and without boundary, `Triangulation` can use an `.obj` file to construct a HEDS for a mesh. To calculate the length of each halfedge, we iterate over each `HalfEdge` object in the `Triangulation`, then find the Euclidean distance between the coordinate positions of the source and destination vertices. Finding vertex curvatures is the same as described earlier --- use `halfedge.twin.next` and `halfedge.next` to find the adjacent faces, then compute the anfle defect. 
+We first instantiate a `Triangulation` object to manage the vertices and edges in a mesh. As long as the input is manifold and without boundary, `Triangulation` can use an `.obj` file to construct a HEDS for a mesh. To calculate the length of each halfedge, we iterate over each `HalfEdge` object in the `Triangulation`, then find the Euclidean distance between the coordinate positions of the source and destination vertices. Finding vertex curvatures is the same as described earlier --- use `halfedge.twin.next` and `halfedge.next` to find the adjacent faces, then compute the angle defect. 
 
 ### Converting from Pointer-Based to Index-Based HEDS
 Eventually, we will want to move parts of our `Triangulation` data to the GPU for parallel processing. Note that with a pointer-based structures, the addresses will not automatically line up when moved to the new GPU address space. Accessing class members or methods using `.` is also not possible on the GPU like on the CPU. Our solution is to "flatten" our data into standard C/C++ arrays, then copying those to and from the GPU. 
@@ -132,10 +132,24 @@ To compute the edge lengths using the GPU, we take the following steps:
 
 
 ### Finding Vertex Curvature on the GPU
+After computing the edge lengths, we have everything we need to compute vertex curvature values with the following steps:
+1. Reallocate the memory needed for the halfedge array, the edge length array, the vertex-halfedge array, and the vertex curvature array on the host and device. 
+2. Each thread is assigned a vertex. In the kernel, we iterate over each outgoing halfedge with `halfedge.twin.next`. We also initialize our total angle as `2 * PI_M`.
+3. For each outgoing halfedge, we use `halfedge.next` and `halfedge.next.next` to get the other two edges of the triangular face. We can then use the indices of these edges to retrieve the edge length information from the edge length array.
+4. With the edge lengths loaded, we can use the [Law of Cosines](#discrete-vertex-gaussian-curvature) from before to get the interior angle. The halfedges `halfedge` and `halfedge.twin.twin` are lengths *a* and *c*, and `halfedge.twin` is length *b*. We also use the HIP internal math function `saturatef__` to clamp the cosine angle. To get the final angle, we call `arcos()`.
+5. With each angle computed, subtract that value from the total angle. After all adjacent faces have been processed, we can write the final angle total to the vertex curvature array.
 
 
 ### Debugging GPU Code
+Thankfully, we can use standard `printf()` statements in the kernel code to help with debugging. For more involved memory debugging, CUDA and HIP have tools to help.
 
+For CUDA, we first want to compile our code with the `-g -O0` flags. Then, we can use `cuda-gdb [program name]`, which acts exactly like you would expect when debugging C/C++ using plain `gdb`.
 
+For HIP, we can compile as usual, then use `ltrace -C -e "hip*" [program name]` to get a detailed output of our GPU calls. This is especially helpful for when a kernel is not executing, but not throwing a `SEGFAULT`, either. 
 
 # Results and Further Directions
+Since the current iteration of this project does not scale up to very high resolution meshes, there is not much of a performance improvement over single-threaded performance. Potential bank-conflict issues also slow down the GPU --- fixing this would require some sorting (in parallel!) of our data structure before processing. 
+
+One improvement that can be made to support high-resolution meshes is sending data to the GPU in "batches" to avoid issues with limited memory. Another is to create partitions of the mesh that can be processed in parallel to avoid bank conflicts. With both of these improvements, we could see much better performance compared to using a single thread. 
+
+Finally, slightly reworking the index-based HEDS to be more streamlined would allow us to use the same data structure to compute numerous other geometric values (face area, unit normals, etc.) in parallel. Going even further, we can support geometry-preserving mesh mutations like edge flips in parallel. This opens the door to many different mesh-based algorithms like coarsening, smoothing, or subdivision. 
